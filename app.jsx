@@ -120,7 +120,8 @@ function BarProgress({ value, max, color, label, unit="g" }) {
   );
 }
 
-export default function App() {
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);() {
   const today = getTodayStr();
   const todayDate = new Date();
   const motivation = MOTIVATIONS[getDayIndex()];
