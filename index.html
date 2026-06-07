@@ -11,677 +11,579 @@
 <body style="margin:0;padding:0;background:#f7f8fc;">
   <div id="root"></div>
   <script type="text/babel">
-    import { useState, useRef, useCallback, useEffect } from "react";
+    const { useState, useRef, useCallback, useEffect } = React;
 
-const MOTIVATIONS = [
-  "今天繼續加油吧！","一定辦得到的，堅持下去！",
-  "只要不放棄，你一定能成功的！","繼續自律，就是進步的基石！",
-  "沒有什麼還能阻止現在的你了！",
-];
-const GOALS = { calories: 2300, carbs: 317, protein: 114 };
-const getDayIndex = () => Math.floor((new Date() - new Date("2024-01-01")) / 86400000) % MOTIVATIONS.length;
-const getTodayStr = () => new Date().toISOString().split("T")[0];
-const WEEKDAYS = ["週日","週一","週二","週三","週四","週五","週六"];
-const MEAL_TYPES = [
-  { key:"breakfast", label:"早餐", emoji:"🌅" },
-  { key:"lunch",     label:"午餐", emoji:"☀️" },
-  { key:"dinner",    label:"晚餐", emoji:"🌙" },
-  { key:"snack",     label:"點心", emoji:"🍪" },
-];
+    const MOTIVATIONS = [
+      "今天繼續加油吧！","一定辦得到的，堅持下去！",
+      "只要不放棄，你一定能成功的！","繼續自律，就是進步的基石！",
+      "沒有什麼還能阻止現在的你了！",
+    ];
+    const GOALS = { calories: 2300, carbs: 317, protein: 114 };
+    const getDayIndex = () => Math.floor((new Date() - new Date("2024-01-01")) / 86400000) % MOTIVATIONS.length;
+    const getTodayStr = () => new Date().toISOString().split("T")[0];
+    const WEEKDAYS = ["週日","週一","週二","週三","週四","週五","週六"];
+    const MEAL_TYPES = [
+      { key:"breakfast", label:"早餐", emoji:"🌅" },
+      { key:"lunch",     label:"午餐", emoji:"☀️" },
+      { key:"dinner",    label:"晚餐", emoji:"🌙" },
+      { key:"snack",     label:"點心", emoji:"🍪" },
+    ];
 
-const C = {
-  bg:"#f7f8fc", surface:"#ffffff", border:"#dde3f0",
-  navy:"#1a2e5a", navyMid:"#2d4a8a", navyLight:"#e8edf8",
-  accent:"#2d6be4", accentBg:"#eaf1fd",
-  red:"#e53935", green:"#2e9e6b", amber:"#e09c20",
-  textMain:"#1a2e5a", textSub:"#6b7a99", textMute:"#aab2cc",
-  navBg:"rgba(247,248,252,0.96)",
-};
+    const C = {
+      bg:"#f7f8fc", surface:"#ffffff", border:"#dde3f0",
+      navy:"#1a2e5a", navyMid:"#2d4a8a", navyLight:"#e8edf8",
+      accent:"#2d6be4", accentBg:"#eaf1fd",
+      red:"#e53935", green:"#2e9e6b", amber:"#e09c20",
+      textMain:"#1a2e5a", textSub:"#6b7a99", textMute:"#aab2cc",
+      navBg:"rgba(247,248,252,0.96)",
+    };
 
-const buildSystemPrompt = (hint) => `你是專業營養師。請辨識食物照片並回傳 JSON，不要有任何其他文字：
+    const buildSystemPrompt = (hint) => `你是專業營養師。請辨識食物照片並回傳 JSON，不要有任何其他文字：
 {"foods":[{"name":"食物名稱","amount":"份量","calories":數字,"protein":數字,"carbs":數字,"fat":數字}],"total":{"calories":數字,"protein":數字,"carbs":數字,"fat":數字},"note":"說明"}
 ${hint ? `用戶備註：${hint}` : ""}單位：kcal、g。`;
 
-const correctTextWithAI = async (raw) => {
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method:"POST", headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:200,
-      system:"你是食物名稱校正專家。校正錯別字或語音辨識錯誤，只回傳校正後文字。若正確原樣回傳。",
-      messages:[{role:"user",content:raw}] }),
-  });
-  const data = await res.json();
-  return data.content?.map(i=>i.text||"").join("").trim() || raw;
-};
-
-// ── Cat SVG ──────────────────────────────────────────────────────────
-function CatIllustration() {
-  return (
-    <svg width="90" height="70" viewBox="0 0 90 70" fill="none" xmlns="http://www.w3.org/2000/svg">
-      {/* body */}
-      <ellipse cx="45" cy="52" rx="28" ry="16" fill="#e8edf8" stroke={C.border} strokeWidth="1.5"/>
-      {/* head */}
-      <ellipse cx="45" cy="34" rx="18" ry="17" fill="#e8edf8" stroke={C.border} strokeWidth="1.5"/>
-      {/* ears */}
-      <polygon points="30,22 26,10 38,20" fill="#e8edf8" stroke={C.border} strokeWidth="1.5" strokeLinejoin="round"/>
-      <polygon points="60,22 64,10 52,20" fill="#e8edf8" stroke={C.border} strokeWidth="1.5" strokeLinejoin="round"/>
-      {/* inner ears */}
-      <polygon points="31,21 28,13 37,21" fill="#fbbdca"/>
-      <polygon points="59,21 62,13 53,21" fill="#fbbdca"/>
-      {/* eyes */}
-      <ellipse cx="38" cy="33" rx="3" ry="3.5" fill={C.navy}/>
-      <ellipse cx="52" cy="33" rx="3" ry="3.5" fill={C.navy}/>
-      <circle cx="39" cy="32" r="1" fill="white"/>
-      <circle cx="53" cy="32" r="1" fill="white"/>
-      {/* nose */}
-      <ellipse cx="45" cy="39" rx="2" ry="1.5" fill="#fbbdca"/>
-      {/* mouth */}
-      <path d="M43 40.5 Q45 43 47 40.5" stroke={C.navyMid} strokeWidth="1.2" fill="none" strokeLinecap="round"/>
-      {/* whiskers left */}
-      <line x1="28" y1="38" x2="40" y2="39" stroke={C.textMute} strokeWidth="1" strokeLinecap="round"/>
-      <line x1="27" y1="41" x2="40" y2="40.5" stroke={C.textMute} strokeWidth="1" strokeLinecap="round"/>
-      {/* whiskers right */}
-      <line x1="62" y1="38" x2="50" y2="39" stroke={C.textMute} strokeWidth="1" strokeLinecap="round"/>
-      <line x1="63" y1="41" x2="50" y2="40.5" stroke={C.textMute} strokeWidth="1" strokeLinecap="round"/>
-      {/* paws peeking over */}
-      <ellipse cx="32" cy="54" rx="8" ry="5" fill="#e8edf8" stroke={C.border} strokeWidth="1.5"/>
-      <ellipse cx="58" cy="54" rx="8" ry="5" fill="#e8edf8" stroke={C.border} strokeWidth="1.5"/>
-      {/* paw toes */}
-      <ellipse cx="28" cy="54" rx="2.5" ry="2" fill="#dde3f0"/>
-      <ellipse cx="32" cy="55" rx="2.5" ry="2" fill="#dde3f0"/>
-      <ellipse cx="36" cy="54" rx="2.5" ry="2" fill="#dde3f0"/>
-      <ellipse cx="54" cy="54" rx="2.5" ry="2" fill="#dde3f0"/>
-      <ellipse cx="58" cy="55" rx="2.5" ry="2" fill="#dde3f0"/>
-      <ellipse cx="62" cy="54" rx="2.5" ry="2" fill="#dde3f0"/>
-      {/* blush */}
-      <ellipse cx="35" cy="40" rx="4" ry="2.5" fill="#fbbdca" opacity="0.5"/>
-      <ellipse cx="55" cy="40" rx="4" ry="2.5" fill="#fbbdca" opacity="0.5"/>
-    </svg>
-  );
-}
-
-function Ring({ value, max, size=130, stroke=11, color, children }) {
-  const r = (size-stroke)/2, circ = 2*Math.PI*r, pct = Math.min(value/max,1);
-  return (
-    <svg width={size} height={size} style={{transform:"rotate(-90deg)"}}>
-      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={C.border} strokeWidth={stroke}/>
-      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color||C.red} strokeWidth={stroke}
-        strokeDasharray={`${pct*circ} ${circ}`} strokeLinecap="round"
-        style={{transition:"stroke-dasharray 0.8s cubic-bezier(.4,0,.2,1)"}}/>
-      <foreignObject x={stroke/2} y={stroke/2} width={size-stroke} height={size-stroke}>
-        <div style={{width:"100%",height:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",transform:"rotate(90deg)"}}>
-          {children}
-        </div>
-      </foreignObject>
-    </svg>
-  );
-}
-
-function BarProgress({ value, max, color, label, unit="g" }) {
-  const pct = Math.min(value/max,1)*100;
-  return (
-    <div style={{flex:1}}>
-      <div style={{display:"flex",justifyContent:"space-between",marginBottom:"0.3rem"}}>
-        <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.72rem",color:C.textSub}}>{label}</span>
-        <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.72rem",color:C.textSub}}>
-          {value}<span style={{color:C.textMute}}>/{max}{unit}</span>
-        </span>
-      </div>
-      <div style={{height:6,background:C.border,borderRadius:99,overflow:"hidden"}}>
-        <div style={{height:"100%",width:`${pct}%`,background:color,borderRadius:99,transition:"width 0.8s cubic-bezier(.4,0,.2,1)"}}/>
-      </div>
-    </div>
-  );
-}
-
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(<App />);() {
-  const today = getTodayStr();
-  const todayDate = new Date();
-  const motivation = MOTIVATIONS[getDayIndex()];
-
-  const [meals, setMeals] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("meals")||"{}"); } catch { return {}; }
-  });
-  const todayMeals = meals[today] || [];
-  const totals = todayMeals.reduce((acc,m) => ({
-    calories: acc.calories+(m.calories||0),
-    protein:  acc.protein +(m.protein ||0),
-    carbs:    acc.carbs   +(m.carbs   ||0),
-  }), {calories:0,protein:0,carbs:0});
-  const remaining = Math.max(GOALS.calories-totals.calories, 0);
-
-  // Navigation
-  const [tab, setTab] = useState("home");
-  const [prevTab, setPrevTab] = useState("home");
-  const goTo = (t) => { setPrevTab(tab); setTab(t); };
-
-  // Add-meal flow state
-  const [flowStep, setFlowStep] = useState(null); // null | "mealType" | "analyze" | "manual"
-  const [selectedMealType, setSelectedMealType] = useState(null);
-  const [flowImage, setFlowImage] = useState(null);
-  const [flowImageBase64, setFlowImageBase64] = useState(null);
-  const [flowHint, setFlowHint] = useState("");
-  const [correctedHint, setCorrectedHint] = useState("");
-  const [isCorrecting, setIsCorrecting] = useState(false);
-  const [analyzing, setAnalyzing] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState(null);
-  const [analyzeError, setAnalyzeError] = useState(null);
-
-  // Manual input state
-  const [manualName, setManualName] = useState("");
-  const [manualCal, setManualCal] = useState("");
-  const [manualCarbs, setManualCarbs] = useState("");
-  const [manualProtein, setManualProtein] = useState("");
-
-  const fileInputRef   = useRef(null);
-  const cameraInputRef = useRef(null);
-  const correctTimer   = useRef(null);
-
-  const saveMeals = (updated) => {
-    setMeals(updated);
-    try { localStorage.setItem("meals", JSON.stringify(updated)); } catch {}
-  };
-
-  // Auto-correct hint
-  useEffect(() => {
-    if (!flowHint.trim()) { setCorrectedHint(""); return; }
-    clearTimeout(correctTimer.current);
-    correctTimer.current = setTimeout(async () => {
-      setIsCorrecting(true);
-      try {
-        const c = await correctTextWithAI(flowHint.trim());
-        setCorrectedHint(c !== flowHint.trim() ? c : "");
-      } catch { setCorrectedHint(""); }
-      finally { setIsCorrecting(false); }
-    }, 1200);
-    return () => clearTimeout(correctTimer.current);
-  }, [flowHint]);
-
-  const processFile = useCallback((file) => {
-    if (!file || !file.type.startsWith("image/")) return;
-    setFlowImage(URL.createObjectURL(file));
-    setAnalysisResult(null);
-    const reader = new FileReader();
-    reader.onload = (e) => setFlowImageBase64(e.target.result.split(",")[1]);
-    reader.readAsDataURL(file);
-  }, []);
-
-  const handleAnalyze = async () => {
-    if (!flowImageBase64 && !flowHint.trim()) { setAnalyzeError("請輸入食物描述或上傳照片"); return; }
-    setAnalyzeError(null); setAnalyzing(true); setAnalysisResult(null);
-    const finalHint = (correctedHint || flowHint).trim();
-    try {
-      const messages = flowImageBase64
-        ? [{role:"user",content:[
-            {type:"image",source:{type:"base64",media_type:"image/jpeg",data:flowImageBase64}},
-            {type:"text",text:finalHint?`照片中有：${finalHint}，請辨識並估算熱量。`:"請辨識這張照片中的食物並估算熱量。"}
-          ]}]
-        : [{role:"user",content:`這是我吃的食物：${finalHint}，請估算熱量。`}];
+    const correctTextWithAI = async (raw) => {
       const res = await fetch("https://api.anthropic.com/v1/messages", {
         method:"POST", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,system:buildSystemPrompt(finalHint),messages}),
+        body: JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:200,
+          system:"你是食物名稱校正專家。校正錯別字或語音辨識錯誤，只回傳校正後文字。若正確原樣回傳。",
+          messages:[{role:"user",content:raw}] }),
       });
       const data = await res.json();
-      const text = data.content?.map(i=>i.text||"").join("")||"";
-      setAnalysisResult(JSON.parse(text.replace(/```json|```/g,"").trim()));
-    } catch { setAnalyzeError("辨識失敗，請再試一次"); }
-    finally { setAnalyzing(false); }
-  };
-
-  const addFromAnalysis = () => {
-    if (!analysisResult) return;
-    const mealLabel = MEAL_TYPES.find(m=>m.key===selectedMealType)?.label || "";
-    const newEntries = analysisResult.foods.map(f => ({
-      ...f, mealType: selectedMealType, mealLabel,
-      time: new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"})
-    }));
-    saveMeals({...meals,[today]:[...(meals[today]||[]),...newEntries]});
-    resetFlow();
-  };
-
-  const addFromManual = () => {
-    if (!manualName.trim() || !manualCal) return;
-    const mealLabel = MEAL_TYPES.find(m=>m.key===selectedMealType)?.label || "";
-    const entry = {
-      name: manualName.trim(), amount:"手動輸入",
-      calories: Number(manualCal), carbs: Number(manualCarbs)||0,
-      protein: Number(manualProtein)||0, fat:0,
-      mealType: selectedMealType, mealLabel,
-      time: new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"})
+      return data.content?.map(i=>i.text||"").join("").trim() || raw;
     };
-    saveMeals({...meals,[today]:[...(meals[today]||[]),entry]});
-    resetFlow();
-  };
 
-  const resetFlow = () => {
-    setFlowStep(null); setSelectedMealType(null);
-    setFlowImage(null); setFlowImageBase64(null);
-    setFlowHint(""); setCorrectedHint("");
-    setAnalysisResult(null); setAnalyzeError(null);
-    setManualName(""); setManualCal(""); setManualCarbs(""); setManualProtein("");
-  };
-
-  // Group meals by type for day view
-  const groupedMeals = MEAL_TYPES.map(mt => ({
-    ...mt,
-    items: todayMeals.filter(m => m.mealType === mt.key),
-  })).filter(g => g.items.length > 0);
-
-  return (
-    <div style={{minHeight:"100vh",background:C.bg,color:C.textMain,display:"flex",flexDirection:"column",maxWidth:420,margin:"0 auto",fontFamily:"'Georgia',serif"}}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap');
-        *{box-sizing:border-box;margin:0;padding:0;}
-        ::-webkit-scrollbar{width:4px;}
-        ::-webkit-scrollbar-thumb{background:${C.border};border-radius:99px;}
-        .tab-btn{background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;padding:0.45rem 1.2rem;color:${C.textMute};}
-        .tab-btn.active{color:${C.navy};}
-        .tab-label{font-family:'DM Sans',sans-serif;font-size:0.63rem;letter-spacing:0.04em;font-weight:500;}
-        .card{background:${C.surface};border:1.5px solid ${C.border};border-radius:16px;box-shadow:0 2px 8px rgba(26,46,90,0.06);}
-        .meal-item{display:flex;justify-content:space-between;align-items:center;padding:0.6rem 0;border-bottom:1px solid ${C.border};}
-        .meal-item:last-child{border-bottom:none;}
-        .primary-btn{background:${C.navy};color:#fff;border:none;border-radius:12px;padding:0.85rem;width:100%;font-family:'DM Sans',sans-serif;font-weight:600;font-size:0.9rem;cursor:pointer;transition:all 0.2s;}
-        .primary-btn:hover{background:${C.navyMid};}
-        .primary-btn:disabled{background:${C.border};color:${C.textMute};cursor:not-allowed;}
-        .outline-btn{background:${C.surface};color:${C.navy};border:1.5px solid ${C.border};border-radius:12px;padding:0.75rem;width:100%;font-family:'DM Sans',sans-serif;font-weight:500;font-size:0.88rem;cursor:pointer;transition:all 0.2s;}
-        .outline-btn:hover{border-color:${C.accent};color:${C.accent};}
-        .text-input{width:100%;background:${C.surface};border:1.5px solid ${C.border};border-radius:12px;padding:0.75rem 0.9rem;color:${C.textMain};font-family:'DM Sans',sans-serif;font-size:0.9rem;outline:none;transition:border-color 0.2s;}
-        .text-input:focus{border-color:${C.accent};}
-        .text-input::placeholder{color:${C.textMute};}
-        .meal-type-btn{flex:1;padding:0.7rem 0.5rem;border:1.5px solid ${C.border};border-radius:12px;background:${C.surface};cursor:pointer;font-family:'DM Sans',sans-serif;font-size:0.8rem;font-weight:500;color:${C.textSub};transition:all 0.2s;display:flex;flex-direction:column;align-items:center;gap:0.2rem;}
-        .meal-type-btn:hover,.meal-type-btn.selected{border-color:${C.navy};background:${C.navyLight};color:${C.navy};}
-        .sheet-overlay{position:fixed;inset:0;background:rgba(26,46,90,0.25);backdrop-filter:blur(4px);z-index:100;display:flex;align-items:flex-end;}
-        .sheet{background:${C.surface};border-radius:20px 20px 0 0;width:100%;max-width:420px;margin:0 auto;padding:1.5rem;max-height:90vh;overflow-y:auto;box-shadow:0 -8px 32px rgba(26,46,90,0.12);}
-        @keyframes slideUp{from{transform:translateY(80px);opacity:0}to{transform:translateY(0);opacity:1}}
-        .sheet{animation:slideUp 0.3s cubic-bezier(.4,0,.2,1);}
-        @keyframes spin{to{transform:rotate(360deg)}}
-        .spin{animation:spin 0.8s linear infinite;}
-        .add-fab{position:fixed;bottom:5rem;left:50%;transform:translateX(-50%);background:${C.navy};color:#fff;border:none;border-radius:99px;padding:0.7rem 1.4rem;font-family:'DM Sans',sans-serif;font-weight:600;font-size:0.88rem;cursor:pointer;display:flex;align-items:center;gap:0.4rem;box-shadow:0 4px 16px rgba(26,46,90,0.25);transition:all 0.2s;z-index:40;}
-        .add-fab:hover{background:${C.navyMid};transform:translateX(-50%) translateY(-2px);}
-        .correction-box{background:rgba(255,255,255,0.97);border:1.5px solid ${C.accent}33;border-radius:10px;padding:0.6rem 0.8rem;display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem;box-shadow:0 2px 8px rgba(26,46,90,0.08);}
-      `}</style>
-
-      <div style={{flex:1,overflowY:"auto",paddingBottom:"5rem"}}>
-
-        {/* ── HOME ── */}
-        {tab==="home" && (
-          <div style={{padding:"1.4rem 1.2rem 1rem"}}>
-            {/* Top bar */}
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"1.1rem"}}>
-              <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"1rem",color:C.navy,lineHeight:1.45,fontWeight:600,flex:1}}>{motivation}</p>
-              <button onClick={()=>goTo("settings")} style={{background:"none",border:"none",cursor:"pointer",color:C.textMute,marginLeft:"1rem",padding:"0.2rem"}}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                  <circle cx="12" cy="12" r="3"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2m-3.22-6.78-1.42 1.42M5.64 18.36l-1.42 1.42M18.36 18.36l-1.42-1.42M5.64 5.64 4.22 4.22"/>
-                </svg>
-              </button>
+    function Ring({ value, max, size=130, stroke=11, color, children }) {
+      const r = (size-stroke)/2, circ = 2*Math.PI*r, pct = Math.min(value/max,1);
+      return (
+        <svg width={size} height={size} style={{transform:"rotate(-90deg)"}}>
+          <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={C.border} strokeWidth={stroke}/>
+          <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color||C.red} strokeWidth={stroke}
+            strokeDasharray={`${pct*circ} ${circ}`} strokeLinecap="round"
+            style={{transition:"stroke-dasharray 0.8s cubic-bezier(.4,0,.2,1)"}}/>
+          <foreignObject x={stroke/2} y={stroke/2} width={size-stroke} height={size-stroke}>
+            <div xmlns="http://www.w3.org/1999/xhtml" style={{width:"100%",height:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",transform:"rotate(90deg)"}}>
+              {children}
             </div>
-            <div style={{height:"1px",background:C.border,marginBottom:"1.2rem"}}/>
+          </foreignObject>
+        </svg>
+      );
+    }
 
-            {/* Date + Ring */}
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"1.1rem"}}>
-              <div>
-                <button onClick={()=>goTo("day")} style={{display:"inline-flex",alignItems:"center",gap:"0.5rem",background:C.navyLight,border:`1.5px solid ${C.border}`,borderRadius:12,padding:"0.45rem 0.8rem",marginBottom:"0.9rem",cursor:"pointer"}}
-                  onMouseEnter={e=>e.currentTarget.style.borderColor=C.accent}
-                  onMouseLeave={e=>e.currentTarget.style.borderColor=C.border}>
-                  <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:"1.5rem",color:C.navy,lineHeight:1,fontWeight:700}}>{todayDate.getDate()}</span>
+    function BarProgress({ value, max, color, label, unit="g" }) {
+      const pct = Math.min(value/max,1)*100;
+      return (
+        <div style={{flex:1}}>
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:"0.3rem"}}>
+            <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.72rem",color:C.textSub}}>{label}</span>
+            <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.72rem",color:C.textSub}}>
+              {value}<span style={{color:C.textMute}}>/{max}{unit}</span>
+            </span>
+          </div>
+          <div style={{height:6,background:C.border,borderRadius:99,overflow:"hidden"}}>
+            <div style={{height:"100%",width:`${pct}%`,background:color,borderRadius:99,transition:"width 0.8s cubic-bezier(.4,0,.2,1)"}}/>
+          </div>
+        </div>
+      );
+    }
+
+    function App() {
+      const today = getTodayStr();
+      const todayDate = new Date();
+      const motivation = MOTIVATIONS[getDayIndex()];
+
+      const [meals, setMeals] = useState(() => {
+        try { return JSON.parse(localStorage.getItem("meals")||"{}"); } catch { return {}; }
+      });
+      const todayMeals = meals[today] || [];
+      const totals = todayMeals.reduce((acc,m) => ({
+        calories: acc.calories+(m.calories||0),
+        protein:  acc.protein +(m.protein ||0),
+        carbs:    acc.carbs   +(m.carbs   ||0),
+      }), {calories:0,protein:0,carbs:0});
+      const remaining = Math.max(GOALS.calories-totals.calories, 0);
+
+      const [tab, setTab] = useState("home");
+      const [prevTab, setPrevTab] = useState("home");
+      const goTo = (t) => { setPrevTab(tab); setTab(t); };
+
+      const [flowStep, setFlowStep] = useState(null);
+      const [selectedMealType, setSelectedMealType] = useState(null);
+      const [flowImage, setFlowImage] = useState(null);
+      const [flowImageBase64, setFlowImageBase64] = useState(null);
+      const [flowHint, setFlowHint] = useState("");
+      const [correctedHint, setCorrectedHint] = useState("");
+      const [isCorrecting, setIsCorrecting] = useState(false);
+      const [analyzing, setAnalyzing] = useState(false);
+      const [analysisResult, setAnalysisResult] = useState(null);
+      const [analyzeError, setAnalyzeError] = useState(null);
+      const [manualName, setManualName] = useState("");
+      const [manualCal, setManualCal] = useState("");
+      const [manualCarbs, setManualCarbs] = useState("");
+      const [manualProtein, setManualProtein] = useState("");
+
+      const fileInputRef   = useRef(null);
+      const cameraInputRef = useRef(null);
+      const correctTimer   = useRef(null);
+
+      const saveMeals = (updated) => {
+        setMeals(updated);
+        try { localStorage.setItem("meals", JSON.stringify(updated)); } catch {}
+      };
+
+      useEffect(() => {
+        if (!flowHint.trim()) { setCorrectedHint(""); return; }
+        clearTimeout(correctTimer.current);
+        correctTimer.current = setTimeout(async () => {
+          setIsCorrecting(true);
+          try {
+            const c = await correctTextWithAI(flowHint.trim());
+            setCorrectedHint(c !== flowHint.trim() ? c : "");
+          } catch { setCorrectedHint(""); }
+          finally { setIsCorrecting(false); }
+        }, 1200);
+        return () => clearTimeout(correctTimer.current);
+      }, [flowHint]);
+
+      const processFile = useCallback((file) => {
+        if (!file || !file.type.startsWith("image/")) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          setFlowImage(e.target.result);
+          setFlowImageBase64(e.target.result.split(",")[1]);
+        };
+        reader.readAsDataURL(file);
+        setAnalysisResult(null);
+      }, []);
+
+      const handleAnalyze = async () => {
+        if (!flowImageBase64 && !flowHint.trim()) { setAnalyzeError("請輸入食物描述或上傳照片"); return; }
+        setAnalyzeError(null); setAnalyzing(true); setAnalysisResult(null);
+        const finalHint = (correctedHint || flowHint).trim();
+        try {
+          const messages = flowImageBase64
+            ? [{role:"user",content:[
+                {type:"image",source:{type:"base64",media_type:"image/jpeg",data:flowImageBase64}},
+                {type:"text",text:finalHint?`照片中有：${finalHint}，請辨識並估算熱量。`:"請辨識這張照片中的食物並估算熱量。"}
+              ]}]
+            : [{role:"user",content:`這是我吃的食物：${finalHint}，請估算熱量。`}];
+          const res = await fetch("https://api.anthropic.com/v1/messages", {
+            method:"POST", headers:{"Content-Type":"application/json"},
+            body: JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,system:buildSystemPrompt(finalHint),messages}),
+          });
+          const data = await res.json();
+          const text = data.content?.map(i=>i.text||"").join("")||"";
+          setAnalysisResult(JSON.parse(text.replace(/```json|```/g,"").trim()));
+        } catch { setAnalyzeError("辨識失敗，請再試一次"); }
+        finally { setAnalyzing(false); }
+      };
+
+      const addFromAnalysis = () => {
+        if (!analysisResult) return;
+        const mealLabel = MEAL_TYPES.find(m=>m.key===selectedMealType)?.label || "";
+        const newEntries = analysisResult.foods.map(f => ({
+          ...f, mealType: selectedMealType, mealLabel,
+          time: new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"})
+        }));
+        saveMeals({...meals,[today]:[...(meals[today]||[]),...newEntries]});
+        resetFlow();
+      };
+
+      const addFromManual = () => {
+        if (!manualName.trim() || !manualCal) return;
+        const mealLabel = MEAL_TYPES.find(m=>m.key===selectedMealType)?.label || "";
+        const entry = {
+          name: manualName.trim(), amount:"手動輸入",
+          calories: Number(manualCal), carbs: Number(manualCarbs)||0,
+          protein: Number(manualProtein)||0, fat:0,
+          mealType: selectedMealType, mealLabel,
+          time: new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"})
+        };
+        saveMeals({...meals,[today]:[...(meals[today]||[]),entry]});
+        resetFlow();
+      };
+
+      const resetFlow = () => {
+        setFlowStep(null); setSelectedMealType(null);
+        setFlowImage(null); setFlowImageBase64(null);
+        setFlowHint(""); setCorrectedHint("");
+        setAnalysisResult(null); setAnalyzeError(null);
+        setManualName(""); setManualCal(""); setManualCarbs(""); setManualProtein("");
+      };
+
+      const groupedMeals = MEAL_TYPES.map(mt => ({
+        ...mt,
+        items: todayMeals.filter(m => m.mealType === mt.key),
+      })).filter(g => g.items.length > 0);
+
+      return (
+        <div style={{minHeight:"100vh",background:C.bg,color:C.textMain,display:"flex",flexDirection:"column",maxWidth:420,margin:"0 auto",fontFamily:"'Georgia',serif"}}>
+          <style>{`
+            @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap');
+            *{box-sizing:border-box;margin:0;padding:0;}
+            ::-webkit-scrollbar{width:4px;}
+            ::-webkit-scrollbar-thumb{background:#dde3f0;border-radius:99px;}
+            .tab-btn{background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;padding:0.45rem 1.2rem;color:#aab2cc;}
+            .tab-btn.active{color:#1a2e5a;}
+            .tab-label{font-family:'DM Sans',sans-serif;font-size:0.63rem;letter-spacing:0.04em;font-weight:500;}
+            .card{background:#ffffff;border:1.5px solid #dde3f0;border-radius:16px;box-shadow:0 2px 8px rgba(26,46,90,0.06);}
+            .meal-item{display:flex;justify-content:space-between;align-items:center;padding:0.6rem 0;border-bottom:1px solid #dde3f0;}
+            .meal-item:last-child{border-bottom:none;}
+            .primary-btn{background:#1a2e5a;color:#fff;border:none;border-radius:12px;padding:0.85rem;width:100%;font-family:'DM Sans',sans-serif;font-weight:600;font-size:0.9rem;cursor:pointer;transition:all 0.2s;}
+            .primary-btn:hover{background:#2d4a8a;}
+            .primary-btn:disabled{background:#dde3f0;color:#aab2cc;cursor:not-allowed;}
+            .outline-btn{background:#ffffff;color:#1a2e5a;border:1.5px solid #dde3f0;border-radius:12px;padding:0.75rem;width:100%;font-family:'DM Sans',sans-serif;font-weight:500;font-size:0.88rem;cursor:pointer;transition:all 0.2s;}
+            .outline-btn:hover{border-color:#2d6be4;color:#2d6be4;}
+            .text-input{width:100%;background:#ffffff;border:1.5px solid #dde3f0;border-radius:12px;padding:0.75rem 0.9rem;color:#1a2e5a;font-family:'DM Sans',sans-serif;font-size:0.9rem;outline:none;transition:border-color 0.2s;}
+            .text-input:focus{border-color:#2d6be4;}
+            .text-input::placeholder{color:#aab2cc;}
+            .meal-type-btn{flex:1;padding:0.7rem 0.5rem;border:1.5px solid #dde3f0;border-radius:12px;background:#ffffff;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:0.8rem;font-weight:500;color:#6b7a99;transition:all 0.2s;display:flex;flex-direction:column;align-items:center;gap:0.2rem;}
+            .meal-type-btn:hover,.meal-type-btn.selected{border-color:#1a2e5a;background:#e8edf8;color:#1a2e5a;}
+            .sheet-overlay{position:fixed;inset:0;background:rgba(26,46,90,0.25);backdrop-filter:blur(4px);z-index:100;display:flex;align-items:flex-end;}
+            .sheet{background:#ffffff;border-radius:20px 20px 0 0;width:100%;max-width:420px;margin:0 auto;padding:1.5rem;max-height:90vh;overflow-y:auto;box-shadow:0 -8px 32px rgba(26,46,90,0.12);animation:slideUp 0.3s cubic-bezier(.4,0,.2,1);}
+            @keyframes slideUp{from{transform:translateY(80px);opacity:0}to{transform:translateY(0);opacity:1}}
+            @keyframes spin{to{transform:rotate(360deg)}}
+            .spin{animation:spin 0.8s linear infinite;}
+            .correction-box{background:rgba(255,255,255,0.97);border:1.5px solid rgba(45,107,228,0.2);border-radius:10px;padding:0.6rem 0.8rem;display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem;box-shadow:0 2px 8px rgba(26,46,90,0.08);}
+          `}</style>
+
+          <div style={{flex:1,overflowY:"auto",paddingBottom:"5rem"}}>
+
+            {/* HOME */}
+            {tab==="home" && (
+              <div style={{padding:"1.4rem 1.2rem 1rem"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"1.1rem"}}>
+                  <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"1rem",color:C.navy,lineHeight:1.45,fontWeight:600,flex:1}}>{motivation}</p>
+                  <button onClick={()=>goTo("settings")} style={{background:"none",border:"none",cursor:"pointer",color:C.textMute,marginLeft:"1rem",padding:"0.2rem"}}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                      <circle cx="12" cy="12" r="3"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2m-3.22-6.78-1.42 1.42M5.64 18.36l-1.42 1.42M18.36 18.36l-1.42-1.42M5.64 5.64 4.22 4.22"/>
+                    </svg>
+                  </button>
+                </div>
+                <div style={{height:"1px",background:C.border,marginBottom:"1.2rem"}}/>
+
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"1.1rem"}}>
                   <div>
-                    <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.6rem",color:C.textSub,lineHeight:1.1}}>{todayDate.getMonth()+1}月</div>
-                    <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.65rem",color:C.navyMid,lineHeight:1.2,fontWeight:500}}>{WEEKDAYS[todayDate.getDay()]}</div>
+                    <button onClick={()=>goTo("day")} style={{display:"inline-flex",alignItems:"center",gap:"0.5rem",background:C.navyLight,border:`1.5px solid ${C.border}`,borderRadius:12,padding:"0.45rem 0.8rem",marginBottom:"0.9rem",cursor:"pointer"}}
+                      onMouseEnter={e=>e.currentTarget.style.borderColor=C.accent}
+                      onMouseLeave={e=>e.currentTarget.style.borderColor=C.border}>
+                      <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:"1.5rem",color:C.navy,lineHeight:1,fontWeight:700}}>{todayDate.getDate()}</span>
+                      <div>
+                        <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.6rem",color:C.textSub,lineHeight:1.1}}>{todayDate.getMonth()+1}月</div>
+                        <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.65rem",color:C.navyMid,lineHeight:1.2,fontWeight:500}}>{WEEKDAYS[todayDate.getDay()]}</div>
+                      </div>
+                    </button>
+                    <div>
+                      <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.68rem",color:C.textSub,marginBottom:"0.15rem"}}>已攝入</p>
+                      <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"1.75rem",color:C.navy,lineHeight:1,fontWeight:700}}>
+                        {totals.calories}<span style={{fontSize:"0.72rem",color:C.textSub,marginLeft:"0.2rem"}}>kcal</span>
+                      </p>
+                      <button onClick={()=>setFlowStep("mealType")} style={{marginTop:"0.6rem",display:"inline-flex",alignItems:"center",gap:"0.35rem",background:C.navy,color:"#fff",border:"none",borderRadius:10,padding:"0.5rem 0.9rem",fontFamily:"'DM Sans',sans-serif",fontWeight:600,fontSize:"0.82rem",cursor:"pointer"}}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5"><path d="M12 5v14M5 12h14"/></svg>
+                        加入餐點
+                      </button>
+                    </div>
                   </div>
-                </button>
-                <div>
-                  <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.68rem",color:C.textSub,marginBottom:"0.15rem"}}>已攝入</p>
-                  <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"1.75rem",color:C.navy,lineHeight:1,fontWeight:700}}>
-                    {totals.calories}<span style={{fontSize:"0.72rem",color:C.textSub,marginLeft:"0.2rem"}}>kcal</span>
-                  </p>
-                  <button onClick={()=>setFlowStep("mealType")} style={{marginTop:"0.6rem",display:"inline-flex",alignItems:"center",gap:"0.35rem",background:C.navy,color:"#fff",border:"none",borderRadius:10,padding:"0.5rem 0.9rem",fontFamily:"'DM Sans',sans-serif",fontWeight:600,fontSize:"0.82rem",cursor:"pointer"}}>
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5"><path d="M12 5v14M5 12h14"/></svg>
-                    加入餐點
+                  <Ring value={totals.calories} max={GOALS.calories} size={126} stroke={11} color={C.red}>
+                    <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"1.3rem",color:C.navy,lineHeight:1,fontWeight:700}}>{remaining}</p>
+                    <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.58rem",color:C.textSub,marginTop:"0.2rem"}}>剩餘大卡</p>
+                  </Ring>
+                </div>
+
+                <div className="card" style={{padding:"0.9rem 1rem",display:"flex",gap:"1.2rem",marginBottom:"1.2rem"}}>
+                  <BarProgress value={totals.carbs}   max={GOALS.carbs}   color={C.amber} label="碳水化合物"/>
+                  <BarProgress value={totals.protein} max={GOALS.protein} color={C.green} label="蛋白質"/>
+                </div>
+
+                {todayMeals.length > 0 && (
+                  <div style={{marginBottom:"1rem"}}>
+                    <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.65rem",color:C.textMute,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:"0.7rem"}}>今日紀錄</p>
+                    <div className="card" style={{padding:"0 1rem"}}>
+                      {todayMeals.slice(-4).map((m,i) => (
+                        <div key={i} className="meal-item">
+                          <div>
+                            <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.85rem",color:C.textMain,fontWeight:500}}>{m.name}</p>
+                            <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.7rem",color:C.textMute}}>{m.mealLabel||""} · {m.time}</p>
+                          </div>
+                          <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.95rem",color:C.navy,fontWeight:600}}>
+                            {m.calories} <span style={{fontSize:"0.63rem",color:C.textSub}}>kcal</span>
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* STATS */}
+            {tab==="stats" && (
+              <div style={{padding:"2rem 1.25rem",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"60vh"}}>
+                <p style={{fontFamily:"'DM Sans',sans-serif",color:C.textMute,fontSize:"0.85rem"}}>統計頁面即將推出</p>
+              </div>
+            )}
+
+            {/* CALENDAR */}
+            {tab==="calendar" && (
+              <div style={{padding:"2rem 1.25rem",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"60vh"}}>
+                <p style={{fontFamily:"'DM Sans',sans-serif",color:C.textMute,fontSize:"0.85rem"}}>日曆頁面即將推出</p>
+              </div>
+            )}
+
+            {/* SETTINGS */}
+            {tab==="settings" && (
+              <div style={{padding:"1.4rem 1.2rem"}}>
+                <div style={{display:"flex",alignItems:"center",gap:"0.75rem",marginBottom:"1.5rem"}}>
+                  <button onClick={()=>goTo(prevTab)} style={{background:"none",border:"none",cursor:"pointer",color:C.textSub,display:"flex"}}>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+                  </button>
+                  <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"1.2rem",color:C.navy,fontWeight:600}}>設定</p>
+                </div>
+                <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"40vh"}}>
+                  <p style={{fontFamily:"'DM Sans',sans-serif",color:C.textMute,fontSize:"0.85rem"}}>設定頁面即將推出</p>
+                </div>
+              </div>
+            )}
+
+            {/* DAY DETAIL */}
+            {tab==="day" && (
+              <div style={{padding:"1.4rem 1.2rem"}}>
+                <div style={{display:"flex",alignItems:"center",gap:"0.75rem",marginBottom:"1.5rem"}}>
+                  <button onClick={()=>goTo("home")} style={{background:"none",border:"none",cursor:"pointer",color:C.textSub,display:"flex"}}>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+                  </button>
+                  <div>
+                    <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"1.2rem",color:C.navy,fontWeight:600}}>{todayDate.getMonth()+1}月{todayDate.getDate()}日</p>
+                    <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.7rem",color:C.textSub}}>{WEEKDAYS[todayDate.getDay()]}</p>
+                  </div>
+                </div>
+
+                <div className="card" style={{padding:"1rem 1.1rem",marginBottom:"1.2rem",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <div>
+                    <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.68rem",color:C.textSub,marginBottom:"0.2rem"}}>今日總攝入</p>
+                    <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"1.6rem",color:C.navy,fontWeight:700,lineHeight:1}}>
+                      {totals.calories}<span style={{fontSize:"0.7rem",color:C.textSub,marginLeft:"0.2rem"}}>kcal</span>
+                    </p>
+                  </div>
+                  <div style={{textAlign:"right"}}>
+                    <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.68rem",color:C.textSub,marginBottom:"0.2rem"}}>目標</p>
+                    <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"1.1rem",color:C.textSub,fontWeight:600}}>{GOALS.calories} kcal</p>
+                  </div>
+                </div>
+
+                <div className="card" style={{padding:"0.9rem 1rem",display:"flex",gap:"1.2rem",marginBottom:"1.2rem"}}>
+                  <BarProgress value={totals.carbs}   max={GOALS.carbs}   color={C.amber} label="碳水化合物"/>
+                  <BarProgress value={totals.protein} max={GOALS.protein} color={C.green} label="蛋白質"/>
+                </div>
+
+                {todayMeals.length === 0 ? (
+                  <div style={{textAlign:"center",padding:"2.5rem 0",color:C.textMute,fontFamily:"'DM Sans',sans-serif",fontSize:"0.85rem"}}>今天還沒有紀錄</div>
+                ) : groupedMeals.map(group => (
+                  <div key={group.key} style={{marginBottom:"1rem"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:"0.4rem",marginBottom:"0.5rem"}}>
+                      <span style={{fontSize:"1rem"}}>{group.emoji}</span>
+                      <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.78rem",color:C.textSub,fontWeight:600}}>{group.label}</p>
+                      <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.72rem",color:C.textMute}}>
+                        · {group.items.reduce((s,m)=>s+(m.calories||0),0)} kcal
+                      </span>
+                    </div>
+                    <div className="card" style={{padding:"0 1rem"}}>
+                      {group.items.map((m,i) => {
+                        const idx = todayMeals.indexOf(m);
+                        return (
+                          <div key={i} className="meal-item" style={{gap:"0.5rem"}}>
+                            <div style={{flex:1}}>
+                              <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.88rem",color:C.textMain,fontWeight:500}}>{m.name}</p>
+                              <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.7rem",color:C.textMute}}>
+                                {m.amount} · 蛋白質{m.protein}g · 碳水{m.carbs}g
+                              </p>
+                            </div>
+                            <div style={{display:"flex",alignItems:"center",gap:"0.6rem"}}>
+                              <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.95rem",color:C.navy,fontWeight:600,whiteSpace:"nowrap"}}>
+                                {m.calories} <span style={{fontSize:"0.63rem",color:C.textSub}}>kcal</span>
+                              </p>
+                              <button onClick={()=>{
+                                const updated={...meals,[today]:todayMeals.filter((_,j)=>j!==idx)};
+                                saveMeals(updated);
+                              }} style={{background:"none",border:"none",cursor:"pointer",color:C.textMute,padding:"0.2rem",fontSize:"0.9rem"}}>✕</button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* BOTTOM NAV */}
+          <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:420,background:"rgba(247,248,252,0.96)",backdropFilter:"blur(12px)",borderTop:"1px solid #dde3f0",display:"flex",justifyContent:"space-around",padding:"0.45rem 0 0.7rem",zIndex:50}}>
+            {[
+              {key:"home",    label:"主頁面", icon:(a)=><svg width="22" height="22" viewBox="0 0 24 24" fill={a?C.navy:"none"} stroke={a?C.navy:C.textMute} strokeWidth="1.8"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>},
+              {key:"stats",   label:"統計",   icon:(a)=><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={a?C.navy:C.textMute} strokeWidth="1.8"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>},
+              {key:"calendar",label:"日曆",   icon:(a)=><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={a?C.navy:C.textMute} strokeWidth="1.8"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>},
+            ].map(({key,label,icon})=>(
+              <button key={key} className={`tab-btn ${tab===key?"active":""}`} onClick={()=>setTab(key)}>
+                {icon(tab===key)}
+                <span className="tab-label" style={{color:tab===key?C.navy:C.textMute}}>{label}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* FLOW: MEAL TYPE */}
+          {flowStep==="mealType" && (
+            <div className="sheet-overlay" onClick={e=>e.target===e.currentTarget&&resetFlow()}>
+              <div className="sheet">
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1rem"}}>
+                  <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"1.1rem",color:C.navy,fontWeight:600}}>吃了什麼？</p>
+                  <button onClick={resetFlow} style={{background:"none",border:"none",color:C.textMute,cursor:"pointer",fontSize:"1.2rem"}}>✕</button>
+                </div>
+                <div style={{display:"flex",alignItems:"center",gap:"0.3rem",marginBottom:"0.5rem"}}>
+                  <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.72rem",color:C.textSub,fontWeight:500}}>先選擇</span>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={C.textSub} strokeWidth="2.5"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+                </div>
+                <div style={{display:"flex",gap:"0.6rem",marginBottom:"1.2rem"}}>
+                  {MEAL_TYPES.map(mt=>(
+                    <button key={mt.key} className={`meal-type-btn ${selectedMealType===mt.key?"selected":""}`}
+                      onClick={()=>setSelectedMealType(mt.key)}>
+                      <span style={{fontSize:"1.3rem"}}>{mt.emoji}</span>
+                      <span>{mt.label}</span>
+                    </button>
+                  ))}
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:"0.75rem"}}>
+                  <button onClick={()=>selectedMealType&&setFlowStep("analyze")}
+                    style={{background:selectedMealType?C.navy:C.border,color:selectedMealType?"#fff":C.textMute,border:"none",borderRadius:12,padding:"0.85rem",width:"100%",fontFamily:"'DM Sans',sans-serif",fontWeight:600,fontSize:"0.9rem",cursor:selectedMealType?"pointer":"not-allowed",transition:"all 0.25s",opacity:selectedMealType?1:0.6}}>
+                    📷 上傳照片 / 拍照辨識
+                  </button>
+                  <button onClick={()=>selectedMealType&&setFlowStep("manual")}
+                    style={{background:selectedMealType?C.surface:C.bg,color:selectedMealType?C.navy:C.textMute,border:`1.5px solid ${C.border}`,borderRadius:12,padding:"0.75rem",width:"100%",fontFamily:"'DM Sans',sans-serif",fontWeight:500,fontSize:"0.88rem",cursor:selectedMealType?"pointer":"not-allowed",transition:"all 0.25s",opacity:selectedMealType?1:0.45}}>
+                    ✏️ 直接輸入營養素
                   </button>
                 </div>
               </div>
-              <Ring value={totals.calories} max={GOALS.calories} size={126} stroke={11} color={C.red}>
-                <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"1.3rem",color:C.navy,lineHeight:1,fontWeight:700}}>{remaining}</p>
-                <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.58rem",color:C.textSub,marginTop:"0.2rem"}}>剩餘大卡</p>
-              </Ring>
             </div>
+          )}
 
-            {/* Bars */}
-            <div className="card" style={{padding:"0.9rem 1rem",display:"flex",gap:"1.2rem",marginBottom:"1.2rem"}}>
-              <BarProgress value={totals.carbs}   max={GOALS.carbs}   color={C.amber} label="碳水化合物"/>
-              <BarProgress value={totals.protein} max={GOALS.protein} color={C.green} label="蛋白質"/>
-            </div>
-
-            {/* Recent meals preview */}
-            {todayMeals.length > 0 && (
-              <div style={{marginBottom:"1rem"}}>
-                <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.65rem",color:C.textMute,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:"0.7rem"}}>今日紀錄</p>
-                <div className="card" style={{padding:"0 1rem"}}>
-                  {todayMeals.slice(-4).map((m,i) => (
-                    <div key={i} className="meal-item">
-                      <div>
-                        <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.85rem",color:C.textMain,fontWeight:500}}>{m.name}</p>
-                        <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.7rem",color:C.textMute}}>{m.mealLabel||""} · {m.time}</p>
-                      </div>
-                      <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.95rem",color:C.navy,fontWeight:600}}>
-                        {m.calories} <span style={{fontSize:"0.63rem",color:C.textSub}}>kcal</span>
-                      </p>
-                    </div>
-                  ))}
+          {/* FLOW: ANALYZE */}
+          {flowStep==="analyze" && (
+            <div className="sheet-overlay" onClick={e=>e.target===e.currentTarget&&resetFlow()}>
+              <div className="sheet">
+                <div style={{display:"flex",alignItems:"center",gap:"0.75rem",marginBottom:"1rem"}}>
+                  <button onClick={()=>setFlowStep("mealType")} style={{background:"none",border:"none",cursor:"pointer",color:C.textSub,display:"flex"}}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+                  </button>
+                  <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"1rem",color:C.navy,fontWeight:600}}>
+                    {MEAL_TYPES.find(m=>m.key===selectedMealType)?.emoji} {MEAL_TYPES.find(m=>m.key===selectedMealType)?.label} · 照片辨識
+                  </p>
                 </div>
-              </div>
-            )}
 
-          </div>
-        )}
-
-        {/* ── STATS ── */}
-        {tab==="stats" && (
-          <div style={{padding:"2rem 1.25rem",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"60vh"}}>
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke={C.border} strokeWidth="1.5" style={{marginBottom:"1rem"}}><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
-            <p style={{fontFamily:"'DM Sans',sans-serif",color:C.textMute,fontSize:"0.85rem"}}>統計頁面即將推出</p>
-          </div>
-        )}
-
-        {/* ── CALENDAR ── */}
-        {tab==="calendar" && (
-          <div style={{padding:"2rem 1.25rem",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"60vh"}}>
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke={C.border} strokeWidth="1.5" style={{marginBottom:"1rem"}}><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-            <p style={{fontFamily:"'DM Sans',sans-serif",color:C.textMute,fontSize:"0.85rem"}}>日曆頁面即將推出</p>
-          </div>
-        )}
-
-        {/* ── SETTINGS ── */}
-        {tab==="settings" && (
-          <div style={{padding:"1.4rem 1.2rem"}}>
-            <div style={{display:"flex",alignItems:"center",gap:"0.75rem",marginBottom:"1.5rem"}}>
-              <button onClick={()=>goTo(prevTab)} style={{background:"none",border:"none",cursor:"pointer",color:C.textSub,display:"flex"}}>
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
-              </button>
-              <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"1.2rem",color:C.navy,fontWeight:600}}>設定</p>
-            </div>
-            <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"40vh"}}>
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke={C.border} strokeWidth="1.5" style={{marginBottom:"1rem"}}>
-                <circle cx="12" cy="12" r="3"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2m-3.22-6.78-1.42 1.42M5.64 18.36l-1.42 1.42M18.36 18.36l-1.42-1.42M5.64 5.64 4.22 4.22"/>
-              </svg>
-              <p style={{fontFamily:"'DM Sans',sans-serif",color:C.textMute,fontSize:"0.85rem"}}>設定頁面即將推出</p>
-            </div>
-          </div>
-        )}
-
-        {/* ── DAY DETAIL ── */}
-        {tab==="day" && (
-          <div style={{padding:"1.4rem 1.2rem"}}>
-            <div style={{display:"flex",alignItems:"center",gap:"0.75rem",marginBottom:"1.5rem"}}>
-              <button onClick={()=>goTo("home")} style={{background:"none",border:"none",cursor:"pointer",color:C.textSub,display:"flex"}}>
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
-              </button>
-              <div>
-                <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"1.2rem",color:C.navy,fontWeight:600}}>{todayDate.getMonth()+1}月{todayDate.getDate()}日</p>
-                <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.7rem",color:C.textSub}}>{WEEKDAYS[todayDate.getDay()]}</p>
-              </div>
-            </div>
-
-            <div className="card" style={{padding:"1rem 1.1rem",marginBottom:"1.2rem",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <div>
-                <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.68rem",color:C.textSub,marginBottom:"0.2rem"}}>今日總攝入</p>
-                <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"1.6rem",color:C.navy,fontWeight:700,lineHeight:1}}>
-                  {totals.calories}<span style={{fontSize:"0.7rem",color:C.textSub,marginLeft:"0.2rem"}}>kcal</span>
-                </p>
-              </div>
-              <div style={{textAlign:"right"}}>
-                <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.68rem",color:C.textSub,marginBottom:"0.2rem"}}>目標</p>
-                <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"1.1rem",color:C.textSub,fontWeight:600}}>{GOALS.calories} kcal</p>
-              </div>
-            </div>
-
-            <div className="card" style={{padding:"0.9rem 1rem",display:"flex",gap:"1.2rem",marginBottom:"1.2rem"}}>
-              <BarProgress value={totals.carbs}   max={GOALS.carbs}   color={C.amber} label="碳水化合物"/>
-              <BarProgress value={totals.protein} max={GOALS.protein} color={C.green} label="蛋白質"/>
-            </div>
-
-            {todayMeals.length === 0 ? (
-              <div style={{textAlign:"center",padding:"2.5rem 0",color:C.textMute,fontFamily:"'DM Sans',sans-serif",fontSize:"0.85rem"}}>今天還沒有紀錄</div>
-            ) : groupedMeals.map(group => (
-              <div key={group.key} style={{marginBottom:"1rem"}}>
-                <div style={{display:"flex",alignItems:"center",gap:"0.4rem",marginBottom:"0.5rem"}}>
-                  <span style={{fontSize:"1rem"}}>{group.emoji}</span>
-                  <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.78rem",color:C.textSub,fontWeight:600}}>{group.label}</p>
-                  <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.72rem",color:C.textMute}}>
-                    · {group.items.reduce((s,m)=>s+(m.calories||0),0)} kcal
-                  </span>
-                </div>
-                <div className="card" style={{padding:"0 1rem"}}>
-                  {group.items.map((m,i) => {
-                    const idx = todayMeals.indexOf(m);
-                    return (
-                      <div key={i} className="meal-item" style={{gap:"0.5rem"}}>
-                        <div style={{flex:1}}>
-                          <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.88rem",color:C.textMain,fontWeight:500}}>{m.name}</p>
-                          <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.7rem",color:C.textMute}}>
-                            {m.amount} · 蛋白質{m.protein}g · 碳水{m.carbs}g
-                          </p>
-                        </div>
-                        <div style={{display:"flex",alignItems:"center",gap:"0.6rem"}}>
-                          <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.95rem",color:C.navy,fontWeight:600,whiteSpace:"nowrap"}}>
-                            {m.calories} <span style={{fontSize:"0.63rem",color:C.textSub}}>kcal</span>
-                          </p>
-                          <button onClick={()=>{
-                            const updated={...meals,[today]:todayMeals.filter((_,j)=>j!==idx)};
-                            saveMeals(updated);
-                          }} style={{background:"none",border:"none",cursor:"pointer",color:C.textMute,padding:"0.2rem",fontSize:"0.9rem"}}>✕</button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* ── BOTTOM NAV ── */}
-      <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:420,background:C.navBg,backdropFilter:"blur(12px)",borderTop:`1px solid ${C.border}`,display:"flex",justifyContent:"space-around",padding:"0.45rem 0 0.7rem",zIndex:50}}>
-        {[
-          {key:"home",    label:"主頁面", icon:(a)=><svg width="22" height="22" viewBox="0 0 24 24" fill={a?C.navy:"none"} stroke={a?C.navy:C.textMute} strokeWidth="1.8"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>},
-          {key:"stats",   label:"統計",   icon:(a)=><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={a?C.navy:C.textMute} strokeWidth="1.8"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>},
-          {key:"calendar",label:"日曆",   icon:(a)=><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={a?C.navy:C.textMute} strokeWidth="1.8"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>},
-        ].map(({key,label,icon})=>(
-          <button key={key} className={`tab-btn ${tab===key?"active":""}`} onClick={()=>setTab(key)}>
-            {icon(tab===key)}
-            <span className="tab-label" style={{color:tab===key?C.navy:C.textMute}}>{label}</span>
-          </button>
-        ))}
-      </div>
-
-      {/* ── FLOW: STEP 1 — Meal type ── */}
-      {flowStep==="mealType" && (
-        <div className="sheet-overlay" onClick={e=>e.target===e.currentTarget&&resetFlow()}>
-          <div className="sheet">
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1rem"}}>
-              <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"1.1rem",color:C.navy,fontWeight:600}}>吃了什麼？</p>
-              <button onClick={resetFlow} style={{background:"none",border:"none",color:C.textMute,cursor:"pointer",fontSize:"1.2rem"}}>✕</button>
-            </div>
-
-            {/* 先選擇提示 */}
-            <div style={{display:"flex",alignItems:"center",gap:"0.3rem",marginBottom:"0.5rem"}}>
-              <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.72rem",color:C.textSub,fontWeight:500}}>先選擇</span>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={C.textSub} strokeWidth="2.5"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
-            </div>
-
-            <div style={{display:"flex",gap:"0.6rem",marginBottom:"1.2rem"}}>
-              {MEAL_TYPES.map(mt=>(
-                <button key={mt.key} className={`meal-type-btn ${selectedMealType===mt.key?"selected":""}`}
-                  onClick={()=>setSelectedMealType(mt.key)}>
-                  <span style={{fontSize:"1.3rem"}}>{mt.emoji}</span>
-                  <span>{mt.label}</span>
-                </button>
-              ))}
-            </div>
-
-            <div style={{display:"flex",flexDirection:"column",gap:"0.75rem"}}>
-              <button
-                onClick={()=>selectedMealType&&setFlowStep("analyze")}
-                style={{
-                  background: selectedMealType ? C.navy : C.border,
-                  color: selectedMealType ? "#fff" : C.textMute,
-                  border:"none",borderRadius:12,padding:"0.85rem",width:"100%",
-                  fontFamily:"'DM Sans',sans-serif",fontWeight:600,fontSize:"0.9rem",
-                  cursor: selectedMealType ? "pointer" : "not-allowed",
-                  transition:"all 0.25s",opacity: selectedMealType ? 1 : 0.6,
-                }}>
-                📷 上傳照片 / 拍照辨識
-              </button>
-              <button
-                onClick={()=>selectedMealType&&setFlowStep("manual")}
-                style={{
-                  background: selectedMealType ? C.surface : C.bg,
-                  color: selectedMealType ? C.navy : C.textMute,
-                  border: `1.5px solid ${selectedMealType ? C.border : C.border}`,
-                  borderRadius:12,padding:"0.75rem",width:"100%",
-                  fontFamily:"'DM Sans',sans-serif",fontWeight:500,fontSize:"0.88rem",
-                  cursor: selectedMealType ? "pointer" : "not-allowed",
-                  transition:"all 0.25s",opacity: selectedMealType ? 1 : 0.45,
-                }}>
-                ✏️ 直接輸入營養素
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── FLOW: STEP 2A — Analyze ── */}
-      {flowStep==="analyze" && (
-        <div className="sheet-overlay" onClick={e=>e.target===e.currentTarget&&resetFlow()}>
-          <div className="sheet">
-            <div style={{display:"flex",alignItems:"center",gap:"0.75rem",marginBottom:"1rem"}}>
-              <button onClick={()=>setFlowStep("mealType")} style={{background:"none",border:"none",cursor:"pointer",color:C.textSub,display:"flex"}}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
-              </button>
-              <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"1rem",color:C.navy,fontWeight:600}}>
-                {MEAL_TYPES.find(m=>m.key===selectedMealType)?.emoji} {MEAL_TYPES.find(m=>m.key===selectedMealType)?.label} · 照片辨識
-              </p>
-            </div>
-
-            {/* Image area */}
-            {flowImage ? (
-              <div style={{position:"relative",borderRadius:12,overflow:"hidden",marginBottom:"1rem"}}>
-                <img src={flowImage} alt="food" style={{width:"100%",maxHeight:200,objectFit:"cover",display:"block"}}/>
-                <button onClick={()=>{setFlowImage(null);setFlowImageBase64(null);setAnalysisResult(null);}}
-                  style={{position:"absolute",top:6,right:6,background:"rgba(26,46,90,0.55)",border:"none",borderRadius:"50%",width:26,height:26,color:"#fff",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"0.8rem"}}>✕</button>
-              </div>
-            ) : (
-              <div style={{display:"flex",gap:"0.6rem",marginBottom:"1rem"}}>
-                <button className="outline-btn" style={{flex:1}} onClick={()=>fileInputRef.current?.click()}>
-                  🖼 相簿
-                </button>
-                <button className="outline-btn" style={{flex:1}} onClick={()=>cameraInputRef.current?.click()}>
-                  📷 拍照
-                </button>
-              </div>
-            )}
-
-            {/* Hint input */}
-            {correctedHint && correctedHint!==flowHint.trim() && (
-              <div className="correction-box">
-                <div style={{flex:1}}>
-                  <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.63rem",color:C.textSub,marginBottom:"0.1rem"}}>建議校正</div>
-                  <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.83rem",color:C.accent,fontWeight:500}}>{correctedHint}</div>
-                </div>
-                <button onClick={()=>{setFlowHint(correctedHint);setCorrectedHint("");}}
-                  style={{background:C.accentBg,border:`1.5px solid ${C.accent}44`,borderRadius:20,color:C.accent,fontFamily:"'DM Sans',sans-serif",fontSize:"0.72rem",fontWeight:500,padding:"0.2rem 0.7rem",cursor:"pointer"}}>套用</button>
-                <button onClick={()=>setCorrectedHint("")} style={{background:"none",border:"none",color:C.textMute,cursor:"pointer",fontSize:"0.85rem"}}>✕</button>
-              </div>
-            )}
-            <input className="text-input" placeholder="這是什麼？（可補充備註）" value={flowHint}
-              onChange={e=>setFlowHint(e.target.value)} style={{marginBottom:"0.5rem"}}/>
-            {isCorrecting && <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.72rem",color:C.textMute,marginBottom:"0.5rem"}}>校正中…</p>}
-            {analyzeError && <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.75rem",color:C.red,marginBottom:"0.5rem"}}>{analyzeError}</p>}
-
-            {/* Analyze button */}
-            {!analysisResult && (
-              <button className="primary-btn" onClick={handleAnalyze} disabled={analyzing||(!flowImageBase64&&!flowHint.trim())}
-                style={{marginBottom:"0.75rem"}}>
-                {analyzing
-                  ? <span style={{display:"flex",alignItems:"center",justifyContent:"center",gap:"0.5rem"}}>
-                      <svg className="spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
-                      辨識中…
-                    </span>
-                  : "開始辨識"
-                }
-              </button>
-            )}
-
-            {/* Results */}
-            {analysisResult && (
-              <div>
-                <div style={{background:C.navyLight,borderRadius:12,padding:"0.75rem 1rem",marginBottom:"0.75rem"}}>
-                  {analysisResult.foods?.map((f,i)=>(
-                    <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"0.4rem 0",borderBottom:i<analysisResult.foods.length-1?`1px solid ${C.border}`:"none"}}>
-                      <div>
-                        <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.85rem",color:C.navy,fontWeight:500}}>{f.name}</p>
-                        <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.7rem",color:C.textSub}}>{f.amount} · 蛋白質{f.protein}g · 碳水{f.carbs}g</p>
-                      </div>
-                      <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.95rem",color:C.navy,fontWeight:600}}>{f.calories}<span style={{fontSize:"0.63rem",color:C.textSub}}>kcal</span></p>
-                    </div>
-                  ))}
-                  <div style={{display:"flex",justifyContent:"space-between",marginTop:"0.5rem",paddingTop:"0.5rem",borderTop:`1px solid ${C.border}`}}>
-                    <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.8rem",color:C.textSub}}>總計</span>
-                    <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:"1rem",color:C.navy,fontWeight:700}}>{analysisResult.total?.calories} kcal</span>
+                {flowImage ? (
+                  <div style={{position:"relative",borderRadius:12,overflow:"hidden",marginBottom:"1rem"}}>
+                    <img src={flowImage} alt="food" style={{width:"100%",maxHeight:200,objectFit:"cover",display:"block"}}/>
+                    <button onClick={()=>{setFlowImage(null);setFlowImageBase64(null);setAnalysisResult(null);}}
+                      style={{position:"absolute",top:6,right:6,background:"rgba(26,46,90,0.55)",border:"none",borderRadius:"50%",width:26,height:26,color:"#fff",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"0.8rem"}}>✕</button>
                   </div>
+                ) : (
+                  <div style={{display:"flex",gap:"0.6rem",marginBottom:"1rem"}}>
+                    <button className="outline-btn" style={{flex:1}} onClick={()=>fileInputRef.current?.click()}>🖼 相簿</button>
+                    <button className="outline-btn" style={{flex:1}} onClick={()=>cameraInputRef.current?.click()}>📷 拍照</button>
+                  </div>
+                )}
+
+                {correctedHint && correctedHint!==flowHint.trim() && (
+                  <div className="correction-box">
+                    <div style={{flex:1}}>
+                      <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.63rem",color:C.textSub,marginBottom:"0.1rem"}}>建議校正</div>
+                      <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.83rem",color:C.accent,fontWeight:500}}>{correctedHint}</div>
+                    </div>
+                    <button onClick={()=>{setFlowHint(correctedHint);setCorrectedHint("");}}
+                      style={{background:C.accentBg,border:`1.5px solid rgba(45,107,228,0.27)`,borderRadius:20,color:C.accent,fontFamily:"'DM Sans',sans-serif",fontSize:"0.72rem",fontWeight:500,padding:"0.2rem 0.7rem",cursor:"pointer"}}>套用</button>
+                    <button onClick={()=>setCorrectedHint("")} style={{background:"none",border:"none",color:C.textMute,cursor:"pointer",fontSize:"0.85rem"}}>✕</button>
+                  </div>
+                )}
+                <input className="text-input" placeholder="這是什麼？（可補充備註）" value={flowHint}
+                  onChange={e=>setFlowHint(e.target.value)} style={{marginBottom:"0.5rem"}}/>
+                {isCorrecting && <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.72rem",color:C.textMute,marginBottom:"0.5rem"}}>校正中…</p>}
+                {analyzeError && <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.75rem",color:C.red,marginBottom:"0.5rem"}}>{analyzeError}</p>}
+
+                {!analysisResult && (
+                  <button className="primary-btn" onClick={handleAnalyze} disabled={analyzing||(!flowImageBase64&&!flowHint.trim())} style={{marginBottom:"0.75rem"}}>
+                    {analyzing
+                      ? <span style={{display:"flex",alignItems:"center",justifyContent:"center",gap:"0.5rem"}}>
+                          <svg className="spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+                          辨識中…
+                        </span>
+                      : "開始辨識"
+                    }
+                  </button>
+                )}
+
+                {analysisResult && (
+                  <div>
+                    <div style={{background:C.navyLight,borderRadius:12,padding:"0.75rem 1rem",marginBottom:"0.75rem"}}>
+                      {analysisResult.foods?.map((f,i)=>(
+                        <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"0.4rem 0",borderBottom:i<analysisResult.foods.length-1?`1px solid ${C.border}`:"none"}}>
+                          <div>
+                            <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.85rem",color:C.navy,fontWeight:500}}>{f.name}</p>
+                            <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.7rem",color:C.textSub}}>{f.amount} · 蛋白質{f.protein}g · 碳水{f.carbs}g</p>
+                          </div>
+                          <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.95rem",color:C.navy,fontWeight:600}}>{f.calories}<span style={{fontSize:"0.63rem",color:C.textSub}}>kcal</span></p>
+                        </div>
+                      ))}
+                      <div style={{display:"flex",justifyContent:"space-between",marginTop:"0.5rem",paddingTop:"0.5rem",borderTop:`1px solid ${C.border}`}}>
+                        <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.8rem",color:C.textSub}}>總計</span>
+                        <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:"1rem",color:C.navy,fontWeight:700}}>{analysisResult.total?.calories} kcal</span>
+                      </div>
+                    </div>
+                    <button className="primary-btn" onClick={addFromAnalysis}>加入{MEAL_TYPES.find(m=>m.key===selectedMealType)?.label}紀錄</button>
+                  </div>
+                )}
+
+                <input ref={fileInputRef}   type="file" accept="image/*"                    onChange={e=>processFile(e.target.files[0])} style={{display:"none"}}/>
+                <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={e=>processFile(e.target.files[0])} style={{display:"none"}}/>
+              </div>
+            </div>
+          )}
+
+          {/* FLOW: MANUAL */}
+          {flowStep==="manual" && (
+            <div className="sheet-overlay" onClick={e=>e.target===e.currentTarget&&resetFlow()}>
+              <div className="sheet">
+                <div style={{display:"flex",alignItems:"center",gap:"0.75rem",marginBottom:"1.2rem"}}>
+                  <button onClick={()=>setFlowStep("mealType")} style={{background:"none",border:"none",cursor:"pointer",color:C.textSub,display:"flex"}}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+                  </button>
+                  <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"1rem",color:C.navy,fontWeight:600}}>
+                    {MEAL_TYPES.find(m=>m.key===selectedMealType)?.emoji} {MEAL_TYPES.find(m=>m.key===selectedMealType)?.label} · 手動輸入
+                  </p>
                 </div>
-                <button className="primary-btn" onClick={addFromAnalysis}>加入{MEAL_TYPES.find(m=>m.key===selectedMealType)?.label}紀錄</button>
-              </div>
-            )}
-
-            <input ref={fileInputRef}   type="file" accept="image/*"               onChange={e=>processFile(e.target.files[0])} style={{display:"none"}}/>
-            <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={e=>processFile(e.target.files[0])} style={{display:"none"}}/>
-          </div>
-        </div>
-      )}
-
-      {/* ── FLOW: STEP 2B — Manual input ── */}
-      {flowStep==="manual" && (
-        <div className="sheet-overlay" onClick={e=>e.target===e.currentTarget&&resetFlow()}>
-          <div className="sheet">
-            <div style={{display:"flex",alignItems:"center",gap:"0.75rem",marginBottom:"1.2rem"}}>
-              <button onClick={()=>setFlowStep("mealType")} style={{background:"none",border:"none",cursor:"pointer",color:C.textSub,display:"flex"}}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
-              </button>
-              <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"1rem",color:C.navy,fontWeight:600}}>
-                {MEAL_TYPES.find(m=>m.key===selectedMealType)?.emoji} {MEAL_TYPES.find(m=>m.key===selectedMealType)?.label} · 手動輸入
-              </p>
-            </div>
-
-            <div style={{display:"flex",flexDirection:"column",gap:"0.75rem",marginBottom:"1rem"}}>
-              <div>
-                <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.75rem",color:C.textSub,marginBottom:"0.3rem"}}>食物名稱</p>
-                <input className="text-input" placeholder="例如：白飯、雞胸肉…" value={manualName} onChange={e=>setManualName(e.target.value)}/>
-              </div>
-              <div>
-                <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.75rem",color:C.textSub,marginBottom:"0.3rem"}}>熱量（kcal）</p>
-                <input className="text-input" type="number" placeholder="0" value={manualCal} onChange={e=>setManualCal(e.target.value)}/>
-              </div>
-              <div>
-                <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.75rem",color:C.textSub,marginBottom:"0.3rem"}}>碳水化合物（g）</p>
-                <input className="text-input" type="number" placeholder="0" value={manualCarbs} onChange={e=>setManualCarbs(e.target.value)}/>
-              </div>
-              <div>
-                <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.75rem",color:C.textSub,marginBottom:"0.3rem"}}>蛋白質（g）</p>
-                <input className="text-input" type="number" placeholder="0" value={manualProtein} onChange={e=>setManualProtein(e.target.value)}/>
+                <div style={{display:"flex",flexDirection:"column",gap:"0.75rem",marginBottom:"1rem"}}>
+                  {[
+                    {label:"食物名稱", placeholder:"例如：白飯、雞胸肉…", val:manualName, set:setManualName, type:"text"},
+                    {label:"熱量（kcal）", placeholder:"0", val:manualCal, set:setManualCal, type:"number"},
+                    {label:"碳水化合物（g）", placeholder:"0", val:manualCarbs, set:setManualCarbs, type:"number"},
+                    {label:"蛋白質（g）", placeholder:"0", val:manualProtein, set:setManualProtein, type:"number"},
+                  ].map(({label,placeholder,val,set,type})=>(
+                    <div key={label}>
+                      <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.75rem",color:C.textSub,marginBottom:"0.3rem"}}>{label}</p>
+                      <input className="text-input" type={type} placeholder={placeholder} value={val} onChange={e=>set(e.target.value)}/>
+                    </div>
+                  ))}
+                </div>
+                <button className="primary-btn" onClick={addFromManual} disabled={!manualName.trim()||!manualCal}>
+                  加入{MEAL_TYPES.find(m=>m.key===selectedMealType)?.label}紀錄
+                </button>
               </div>
             </div>
-
-            <button className="primary-btn" onClick={addFromManual} disabled={!manualName.trim()||!manualCal}>
-              加入{MEAL_TYPES.find(m=>m.key===selectedMealType)?.label}紀錄
-            </button>
-          </div>
+          )}
         </div>
-      )}
-    </div>
-  );
-}
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
   </script>
 </body>
 </html>
