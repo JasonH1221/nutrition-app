@@ -317,11 +317,175 @@ ${hint ? `用戶備註：${hint}` : ""}單位：kcal、g。`;
             )}
 
             {/* STATS */}
-            {tab==="stats" && (
-              <div style={{padding:"2rem 1.25rem",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"60vh"}}>
-                <p style={{fontFamily:"'DM Sans',sans-serif",color:C.textMute,fontSize:"0.85rem"}}>統計頁面即將推出</p>
-              </div>
-            )}
+            {tab==="stats" && (() => {
+              const [statsMode, setStatsMode] = useState("week");
+              const [offset, setOffset] = useState(0);
+
+              // Build date range
+              const getRange = () => {
+                const now = new Date();
+                if (statsMode === "week") {
+                  const day = now.getDay();
+                  const monday = new Date(now);
+                  monday.setDate(now.getDate() - ((day+6)%7) + offset*7);
+                  return Array.from({length:7},(_,i)=>{
+                    const d = new Date(monday);
+                    d.setDate(monday.getDate()+i);
+                    return d;
+                  });
+                } else {
+                  const first = new Date(now.getFullYear(), now.getMonth()+offset, 1);
+                  const last  = new Date(now.getFullYear(), now.getMonth()+offset+1, 0);
+                  return Array.from({length:last.getDate()},(_,i)=>{
+                    const d = new Date(first);
+                    d.setDate(i+1);
+                    return d;
+                  });
+                }
+              };
+
+              const range = getRange();
+              const dateStr = d => d.toISOString().split("T")[0];
+
+              const dayData = range.map(d => {
+                const m = meals[dateStr(d)] || [];
+                const cal  = m.reduce((s,x)=>s+(x.calories||0),0);
+                const carb = m.reduce((s,x)=>s+(x.carbs||0),0);
+                const prot = m.reduce((s,x)=>s+(x.protein||0),0);
+                return { date:d, cal, carb, prot, hasData: m.length>0 };
+              });
+
+              const daysWithData = dayData.filter(d=>d.hasData);
+              const avgCal  = daysWithData.length ? Math.round(daysWithData.reduce((s,d)=>s+d.cal,0)/daysWithData.length) : 0;
+              const avgCarb = daysWithData.length ? Math.round(daysWithData.reduce((s,d)=>s+d.carb,0)/daysWithData.length) : 0;
+              const avgProt = daysWithData.length ? Math.round(daysWithData.reduce((s,d)=>s+d.prot,0)/daysWithData.length) : 0;
+
+              // Line chart SVG
+              const W=340, H=160, PL=36, PR=16, PT=16, PB=28;
+              const chartW=W-PL-PR, chartH=H-PT-PB;
+              const maxVal = Math.max(...dayData.map(d=>d.cal), GOALS.calories) * 1.1 || 2500;
+              const n = dayData.length;
+              const xPos = i => PL + (n===1?chartW/2:i/(n-1)*chartW);
+              const yPos = v => PT + chartH - (v/maxVal)*chartH;
+
+              const dataPoints = dayData.map((d,i)=>({x:xPos(i),y:yPos(d.cal),d}));
+              const linePath = dataPoints.filter(p=>p.d.hasData).map((p,i)=>`${i===0?"M":"L"}${p.x},${p.y}`).join(" ");
+              const goalY = yPos(GOALS.calories);
+
+              // Period label
+              const periodLabel = statsMode==="week"
+                ? `${range[0].getMonth()+1}/${range[0].getDate()} – ${range[6].getMonth()+1}/${range[6].getDate()}`
+                : `${range[0].getFullYear()}年${range[0].getMonth()+1}月`;
+
+              const isCurrentPeriod = offset===0;
+
+              return (
+                <div style={{padding:"1.4rem 1.2rem"}}>
+                  {/* Header */}
+                  <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"1.1rem",color:C.navy,fontWeight:600,marginBottom:"1rem"}}>統計</p>
+
+                  {/* Mode switch */}
+                  <div style={{display:"flex",background:C.navyLight,borderRadius:10,padding:"0.2rem",marginBottom:"1rem"}}>
+                    {[["week","本週"],["month","本月"]].map(([key,label])=>(
+                      <button key={key} onClick={()=>{setStatsMode(key);setOffset(0);}}
+                        style={{flex:1,padding:"0.5rem",border:"none",borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontSize:"0.82rem",fontWeight:600,cursor:"pointer",transition:"all 0.2s",
+                          background:statsMode===key?C.surface:"transparent",
+                          color:statsMode===key?C.navy:C.textSub,
+                          boxShadow:statsMode===key?"0 1px 4px rgba(26,46,90,0.1)":"none"}}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Period nav */}
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"1rem"}}>
+                    <button onClick={()=>setOffset(o=>o-1)} style={{background:"none",border:"none",cursor:"pointer",color:C.textSub,padding:"0.3rem",display:"flex"}}>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6 6-6"/></svg>
+                    </button>
+                    <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.88rem",color:C.navy,fontWeight:600}}>{periodLabel}</p>
+                    <button onClick={()=>!isCurrentPeriod&&setOffset(o=>o+1)}
+                      style={{background:"none",border:"none",cursor:isCurrentPeriod?"not-allowed":"pointer",color:isCurrentPeriod?C.textMute:C.textSub,padding:"0.3rem",display:"flex",opacity:isCurrentPeriod?0.3:1}}>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6"/></svg>
+                    </button>
+                  </div>
+
+                  {/* Line chart */}
+                  <div className="card" style={{padding:"1rem",marginBottom:"1rem",overflowX:"auto"}}>
+                    <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.7rem",color:C.textSub,marginBottom:"0.5rem"}}>每日熱量（kcal）</p>
+                    <svg width={W} height={H} style={{display:"block",maxWidth:"100%"}}>
+                      {/* Grid lines */}
+                      {[0,0.25,0.5,0.75,1].map(f=>(
+                        <g key={f}>
+                          <line x1={PL} y1={PT+chartH*(1-f)} x2={W-PR} y2={PT+chartH*(1-f)} stroke={C.border} strokeWidth="1" strokeDasharray={f===0?"":"3,3"}/>
+                          <text x={PL-4} y={PT+chartH*(1-f)+4} textAnchor="end" fontSize="9" fill={C.textMute}>{Math.round(maxVal*f/100)*100}</text>
+                        </g>
+                      ))}
+                      {/* Goal line */}
+                      <line x1={PL} y1={goalY} x2={W-PR} y2={goalY} stroke={C.accent} strokeWidth="1.5" strokeDasharray="4,3" opacity="0.6"/>
+                      <text x={W-PR+2} y={goalY+4} fontSize="8" fill={C.accent} opacity="0.8">目標</text>
+                      {/* Data line */}
+                      {linePath && <path d={linePath} fill="none" stroke={C.navy} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>}
+                      {/* Dots + x labels */}
+                      {dataPoints.map((p,i)=>(
+                        <g key={i}>
+                          {p.d.hasData && (
+                            <circle cx={p.x} cy={p.y} r="3.5" fill={C.navy} stroke={C.surface} strokeWidth="1.5"/>
+                          )}
+                          <text x={p.x} y={H-6} textAnchor="middle" fontSize="9" fill={C.textMute}>
+                            {statsMode==="week"
+                              ? WEEKDAYS[p.d.date.getDay()].replace("週","")
+                              : p.d.date.getDate()%5===0||p.d.date.getDate()===1?p.d.date.getDate():""
+                            }
+                          </text>
+                        </g>
+                      ))}
+                    </svg>
+                    {/* Legend */}
+                    <div style={{display:"flex",gap:"1rem",marginTop:"0.5rem"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:"0.3rem"}}>
+                        <div style={{width:16,height:2,background:C.navy,borderRadius:1}}/>
+                        <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.7rem",color:C.textSub}}>實際攝入</span>
+                      </div>
+                      <div style={{display:"flex",alignItems:"center",gap:"0.3rem"}}>
+                        <div style={{width:16,height:2,background:C.accent,borderRadius:1,opacity:0.6}}/>
+                        <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.7rem",color:C.textSub}}>目標</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Averages */}
+                  {daysWithData.length === 0 ? (
+                    <div style={{textAlign:"center",padding:"1.5rem 0",color:C.textMute,fontFamily:"'DM Sans',sans-serif",fontSize:"0.85rem"}}>這個區間還沒有紀錄</div>
+                  ) : (
+                    <div>
+                      <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.65rem",color:C.textMute,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:"0.7rem"}}>
+                        平均（共 {daysWithData.length} 天有紀錄）
+                      </p>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0.75rem"}}>
+                        {[
+                          {label:"熱量",val:avgCal,unit:"kcal",goal:GOALS.calories,color:C.red},
+                          {label:"碳水",val:avgCarb,unit:"g",goal:GOALS.carbs,color:C.amber},
+                          {label:"蛋白質",val:avgProt,unit:"g",goal:GOALS.protein,color:C.green},
+                        ].map(({label,val,unit,goal,color})=>{
+                          const pct = Math.min(val/goal*100,100);
+                          return (
+                            <div key={label} className="card" style={{padding:"0.8rem 0.7rem",textAlign:"center"}}>
+                              <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.65rem",color:C.textSub,marginBottom:"0.3rem"}}>{label}</p>
+                              <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"1.1rem",color:C.navy,fontWeight:700,lineHeight:1}}>{val}</p>
+                              <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.6rem",color:C.textMute,marginBottom:"0.5rem"}}>{unit}</p>
+                              <div style={{height:4,background:C.border,borderRadius:99,overflow:"hidden"}}>
+                                <div style={{height:"100%",width:`${pct}%`,background:color,borderRadius:99}}/>
+                              </div>
+                              <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"0.6rem",color:C.textMute,marginTop:"0.3rem"}}>{Math.round(pct)}% 目標</p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* CALENDAR */}
             {tab==="calendar" && (
