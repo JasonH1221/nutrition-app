@@ -121,6 +121,8 @@ ${hint ? `用戶備註：${hint}` : ""}單位：kcal、g。`;
       const [manualCal, setManualCal] = useState("");
       const [manualCarbs, setManualCarbs] = useState("");
       const [manualProtein, setManualProtein] = useState("");
+      const [statsMode, setStatsMode] = useState("week");
+      const [statsOffset, setStatsOffset] = useState(0);
 
       const fileInputRef   = useRef(null);
       const cameraInputRef = useRef(null);
@@ -317,9 +319,9 @@ ${hint ? `用戶備註：${hint}` : ""}單位：kcal、g。`;
             )}
 
             {/* STATS */}
-            {tab==="stats" && (() => {
-              const [statsMode, setStatsMode] = useState("week");
-              const [offset, setOffset] = useState(0);
+            {tab==="stats" && (()=>{
+              const offset = statsOffset;
+              const setOffset = setStatsOffset;
 
               // Build date range
               const getRange = () => {
@@ -379,8 +381,7 @@ ${hint ? `用戶備註：${hint}` : ""}單位：kcal、g。`;
 
               const isCurrentPeriod = offset===0;
 
-              return (
-                <div style={{padding:"1.4rem 1.2rem"}}>
+              return <div style={{padding:"1.4rem 1.2rem"}}>
                   {/* Header */}
                   <p style={{fontFamily:"'DM Sans',sans-serif",fontSize:"1.1rem",color:C.navy,fontWeight:600,marginBottom:"1rem"}}>統計</p>
 
@@ -483,8 +484,7 @@ ${hint ? `用戶備註：${hint}` : ""}單位：kcal、g。`;
                       </div>
                     </div>
                   )}
-                </div>
-              );
+                </div>;
             })()}
 
             {/* CALENDAR */}
